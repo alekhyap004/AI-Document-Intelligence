@@ -1,11 +1,19 @@
 import os
 import shutil
 from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from src.backend.ingest import save_pdf, build_index
 from src.backend.query import query_document, summarize_document
 
 app = FastAPI()
+# Allow requests from React frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class ChatRequest(BaseModel):
     doc_id: str
