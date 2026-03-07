@@ -3,11 +3,18 @@ import shutil
 from fastapi import FastAPI, UploadFile, File
 from pydantic import BaseModel
 from src.backend.ingest import save_pdf, build_index
-from src.backend.query import query_document
+from src.backend.query import query_document, summarize_document
 
 app = FastAPI()
 
 class ChatRequest(BaseModel):
+    doc_id: str
+    question: str
+
+class SummarizeRequest(BaseModel):
+    doc_id: str
+
+class ExtractRequest(BaseModel):
     doc_id: str
     question: str
 
@@ -29,3 +36,13 @@ async def upload_pdf(file: UploadFile = File(...)):
 def chat(request: ChatRequest):
     answer = query_document(request.doc_id, request.question)
     return {"answer": answer}
+
+@app.post("/summarize")
+def summarize(request: SummarizeRequest):
+    summary = summarize_document(request.doc_id)
+    return {"summary": summary}
+
+@app.post("/extract")
+def extract(request: ExtractRequest):
+    result = query_document(request.doc_id, request.question)
+    return {"result": result}

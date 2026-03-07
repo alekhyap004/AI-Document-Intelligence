@@ -21,3 +21,21 @@ def query_document(doc_id: str, question: str) -> str:
     response = query_engine.query(question)
 
     return str(response)
+
+def summarize_document(doc_id: str) -> str:
+    index_path = os.path.join(INDEX_DIR, doc_id)
+    
+    if not os.path.exists(index_path):
+        return "Document not found. Please upload it first."
+    
+    storage_context = StorageContext.from_defaults(persist_dir=index_path)
+    index = load_index_from_storage(storage_context)
+    
+    query_engine = index.as_query_engine()
+    response = query_engine.query(
+        "Please provide a concise summary of this document in 3-5 sentences."
+    )
+    
+    return str(response)
+
+
