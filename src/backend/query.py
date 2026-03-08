@@ -2,12 +2,11 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 from llama_index.core import StorageContext, load_index_from_storage, VectorStoreIndex, Settings
-from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.llms.anthropic import Anthropic
 
 Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
-Settings.llm = Ollama(model="llama3.2", request_timeout=120.0)
-
+Settings.llm = Anthropic(model="claude-sonnet-4-20250514", api_key=os.getenv("ANTHROPIC_API_KEY"))
 INDEX_DIR = "indexes"
 
 def query_document(doc_id: str, question: str) -> str:
