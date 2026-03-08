@@ -40,7 +40,7 @@ def query_multiple_documents(doc_ids: list, question: str) -> str:
         return "No documents found. Please upload some PDFs first."
 
     # Use response synthesizer directly with retrieved nodes
-    synthesizer = get_response_synthesizer()
+    synthesizer = get_response_synthesizer(llm=Settings.llm)
     response = synthesizer.synthesize(question, nodes=all_nodes)
     return str(response)
 
