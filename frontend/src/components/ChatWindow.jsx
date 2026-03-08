@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
 
+const API_BASE = import.meta.env.VITE_API_URL || ''
+
 export default function ChatWindow({ conversation, docs, onConversationUpdate }) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -26,12 +28,11 @@ export default function ChatWindow({ conversation, docs, onConversationUpdate })
     setInput('')
     setLoading(true)
 
-    // Optimistically add user message to UI
     const optimisticMessages = [...messages, { role: 'user', content: question }]
     onConversationUpdate({ ...conversation, messages: optimisticMessages })
 
     try {
-      const res = await axios.post(`/api/conversations/${conversation.id}/chat`, {
+      const res = await axios.post(`${API_BASE}/api/conversations/${conversation.id}/chat`, {
         doc_ids: docs.map(d => d.id),
         question
       })
@@ -41,7 +42,6 @@ export default function ChatWindow({ conversation, docs, onConversationUpdate })
         { role: 'assistant', content: res.data.answer }
       ]
 
-      // Update title if it was auto-set
       const updatedConvo = {
         ...conversation,
         title: question.slice(0, 50),
@@ -65,7 +65,7 @@ export default function ChatWindow({ conversation, docs, onConversationUpdate })
     onConversationUpdate({ ...conversation, messages: optimisticMessages })
     try {
       const summaries = await Promise.all(
-        docs.map(doc => axios.post('/api/summarize', { doc_id: doc.id })
+        docs.map(doc => axios.post(`${API_BASE}/api/summarize`, { doc_id: doc.id })
           .then(res => `${doc.name}:\n${res.data.summary}`)
         )
       )
@@ -90,7 +90,7 @@ export default function ChatWindow({ conversation, docs, onConversationUpdate })
     onConversationUpdate({ ...conversation, messages: optimisticMessages })
     try {
       const results = await Promise.all(
-        docs.map(doc => axios.post('/api/extract', { doc_id: doc.id, schema: extractSchema })
+        docs.map(doc => axios.post(`${API_BASE}/api/extract`, { doc_id: doc.id, schema: extractSchema })
           .then(res => `${doc.name}:\n${res.data.result}`)
         )
       )
@@ -121,8 +121,6 @@ export default function ChatWindow({ conversation, docs, onConversationUpdate })
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh' }}>
-
-      {/* Top bar */}
       <div style={{
         padding: '14px 20px', borderBottom: '1px solid #2f2f2f',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between'
@@ -142,7 +140,6 @@ export default function ChatWindow({ conversation, docs, onConversationUpdate })
         </div>
       </div>
 
-      {/* Extract bar */}
       {showExtract && (
         <div style={{ padding: '10px 20px', background: '#1a1a1a', display: 'flex', gap: '8px' }}>
           <input
@@ -157,7 +154,6 @@ export default function ChatWindow({ conversation, docs, onConversationUpdate })
         </div>
       )}
 
-      {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', color: '#666', fontSize: '13px', marginTop: '40px' }}>
@@ -201,7 +197,6 @@ export default function ChatWindow({ conversation, docs, onConversationUpdate })
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
       <div style={{ padding: '16px 20px', borderTop: '1px solid #2f2f2f', display: 'flex', gap: '10px' }}>
         <input
           value={input}

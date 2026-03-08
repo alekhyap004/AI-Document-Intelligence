@@ -3,20 +3,21 @@ import axios from 'axios'
 import Sidebar from './components/Sidebar'
 import ChatWindow from './components/ChatWindow'
 
+const API_BASE = import.meta.env.VITE_API_URL || ''
+
 export default function App() {
   const [conversations, setConversations] = useState([])
   const [activeConversation, setActiveConversation] = useState(null)
   const [docs, setDocs] = useState([])
   const [uploading, setUploading] = useState(false)
 
-  // Load all conversations when app starts
   useEffect(() => {
     fetchConversations()
   }, [])
 
   const fetchConversations = async () => {
     try {
-      const res = await axios.get('/api/conversations')
+      const res = await axios.get(`${API_BASE}/api/conversations`)
       setConversations(res.data)
     } catch (err) {
       console.error('Failed to fetch conversations:', err)
@@ -25,7 +26,7 @@ export default function App() {
 
   const handleNewChat = async () => {
     try {
-      const res = await axios.post('/api/conversations')
+      const res = await axios.post(`${API_BASE}/api/conversations`)
       const newConvo = res.data
       setConversations(prev => [newConvo, ...prev])
       setActiveConversation({ ...newConvo, messages: [] })
@@ -37,9 +38,8 @@ export default function App() {
 
   const handleSelectConversation = async (convo) => {
     try {
-      const res = await axios.get(`/api/conversations/${convo.id}`)
+      const res = await axios.get(`${API_BASE}/api/conversations/${convo.id}`)
       setActiveConversation(res.data)
-      // Restore real doc names from database
       setDocs(res.data.docs || [])
     } catch (err) {
       console.error('Failed to load conversation:', err)
@@ -49,7 +49,7 @@ export default function App() {
   const handleUpload = async (formData, fileName) => {
     setUploading(true)
     try {
-      const res = await axios.post('/api/upload', formData)
+      const res = await axios.post(`${API_BASE}/api/upload`, formData)
       const newDoc = { id: res.data.doc_id, name: fileName }
       setDocs(prev => [...prev, newDoc])
     } catch (err) {
