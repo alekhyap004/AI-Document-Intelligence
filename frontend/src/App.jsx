@@ -1,12 +1,52 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import axios from 'axios'
 import Sidebar from './components/Sidebar'
 import ChatWindow from './components/ChatWindow'
 
 export default function App() {
+  const [conversations, setConversations] = useState([])
+  const [activeConversation, setActiveConversation] = useState(null)
   const [docs, setDocs] = useState([])
-  const [activeDoc, setActiveDoc] = useState(null)
   const [uploading, setUploading] = useState(false)
+
+  // Load all conversations when app starts
+  useEffect(() => {
+    fetchConversations()
+  }, [])
+
+  const fetchConversations = async () => {
+    try {
+      const res = await axios.get('/api/conversations')
+      setConversations(res.data)
+    } catch (err) {
+      console.error('Failed to fetch conversations:', err)
+    }
+  }
+
+  const handleNewChat = async () => {
+    try {
+      const res = await axios.post('/api/conversations')
+      const newConvo = res.data
+      setConversations(prev => [newConvo, ...prev])
+      setActiveConversation(newConvo)
+      setDocs([])  // clear docs for new conversation
+    } catch (err) {
+      alert('Failed to create conversation.')
+    }
+  }
+
+  const handleSelectConversation = async (convo) => {
+    try {
+      const res = await axios.get(`/api/conversations/${convo.id}`)
+      setActiveConversation(res.data)
+      // Restore the docs that belong to this conversation
+      const savedDocIds = res.data.doc_ids || []
+      // We only have IDs not names, so map them back
+      setDocs(savedDocIds.map(id => ({ id, name: `Document (${id.slice(0, 8)}...)` })))
+    } catch (err) {
+      console.error('Failed to load conversation:', err)
+    }
+  }
 
   const handleUpload = async (formData, fileName) => {
     setUploading(true)
@@ -14,23 +54,35 @@ export default function App() {
       const res = await axios.post('/api/upload', formData)
       const newDoc = { id: res.data.doc_id, name: fileName }
       setDocs(prev => [...prev, newDoc])
-      setActiveDoc(newDoc)
     } catch (err) {
       alert('Upload failed. Make sure the backend is running.')
     }
     setUploading(false)
   }
 
+  const handleConversationUpdate = (updatedConvo) => {
+    setActiveConversation(updatedConvo)
+    setConversations(prev =>
+      prev.map(c => c.id === updatedConvo.id ? updatedConvo : c)
+    )
+  }
+
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <Sidebar
+        conversations={conversations}
+        activeConversationId={activeConversation?.id}
+        onNewChat={handleNewChat}
+        onSelectConversation={handleSelectConversation}
         docs={docs}
-        activeDockId={activeDoc?.id}
-        onDocSelect={setActiveDoc}
         onUpload={handleUpload}
         uploading={uploading}
       />
-      <ChatWindow doc={activeDoc} />
+      <ChatWindow
+        conversation={activeConversation}
+        docs={docs}
+        onConversationUpdate={handleConversationUpdate}
+      />
     </div>
   )
 }

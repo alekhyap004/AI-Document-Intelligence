@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
 
-export default function ChatWindow({ doc }) {
-  const [messages, setMessages] = useState([])
+export default function ChatWindow({ conversation, docs, onConversationUpdate }) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [summarizing, setSummarizing] = useState(false)
@@ -11,73 +10,112 @@ export default function ChatWindow({ doc }) {
   const [showExtract, setShowExtract] = useState(false)
   const bottomRef = useRef(null)
 
-  // Scroll to bottom when messages change
+  const messages = conversation?.messages || []
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Reset chat when document changes
-  useEffect(() => {
-    setMessages([])
-  }, [doc?.id])
-
   const sendMessage = async () => {
-    if (!input.trim() || !doc || loading) return
+    if (!input.trim() || !conversation || loading) return
+    if (docs.length === 0) {
+      alert('Please upload at least one PDF first.')
+      return
+    }
     const question = input.trim()
     setInput('')
-
-    // Add user message immediately
-    const newMessages = [...messages, { role: 'user', content: question }]
-    setMessages(newMessages)
     setLoading(true)
 
+    // Optimistically add user message to UI
+    const optimisticMessages = [...messages, { role: 'user', content: question }]
+    onConversationUpdate({ ...conversation, messages: optimisticMessages })
+
     try {
-      const res = await axios.post('/api/chat', {
-        doc_id: doc.id,
-        question,
-        history: messages // send full history for memory
+      const res = await axios.post(`/api/conversations/${conversation.id}/chat`, {
+        doc_ids: docs.map(d => d.id),
+        question
       })
-      setMessages([...newMessages, { role: 'assistant', content: res.data.answer }])
+
+      const updatedMessages = [
+        ...optimisticMessages,
+        { role: 'assistant', content: res.data.answer }
+      ]
+
+      // Update title if it was auto-set
+      const updatedConvo = {
+        ...conversation,
+        title: question.slice(0, 50),
+        messages: updatedMessages
+      }
+      onConversationUpdate(updatedConvo)
     } catch (err) {
-      setMessages([...newMessages, { role: 'assistant', content: 'Error getting response.' }])
+      const errorMessages = [
+        ...optimisticMessages,
+        { role: 'assistant', content: 'Error getting response.' }
+      ]
+      onConversationUpdate({ ...conversation, messages: errorMessages })
     }
     setLoading(false)
   }
 
   const handleSummarize = async () => {
-    if (!doc || summarizing) return
+    if (docs.length === 0 || summarizing) return
     setSummarizing(true)
-    setMessages(prev => [...prev, { role: 'user', content: '📋 Summarize this document' }])
+    const optimisticMessages = [...messages, { role: 'user', content: '📋 Summarize all documents' }]
+    onConversationUpdate({ ...conversation, messages: optimisticMessages })
     try {
-      const res = await axios.post('/api/summarize', { doc_id: doc.id })
-      setMessages(prev => [...prev, { role: 'assistant', content: res.data.summary }])
+      const summaries = await Promise.all(
+        docs.map(doc => axios.post('/api/summarize', { doc_id: doc.id })
+          .then(res => `${doc.name}:\n${res.data.summary}`)
+        )
+      )
+      onConversationUpdate({
+        ...conversation,
+        messages: [...optimisticMessages, { role: 'assistant', content: summaries.join('\n\n') }]
+      })
     } catch (err) {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Error summarizing.' }])
+      onConversationUpdate({
+        ...conversation,
+        messages: [...optimisticMessages, { role: 'assistant', content: 'Error summarizing.' }]
+      })
     }
     setSummarizing(false)
   }
 
   const handleExtract = async () => {
-    if (!doc || !extractSchema.trim() || extracting) return
+    if (docs.length === 0 || !extractSchema.trim() || extracting) return
     setExtracting(true)
     setShowExtract(false)
-    setMessages(prev => [...prev, { role: 'user', content: `🔍 Extract: ${extractSchema}` }])
+    const optimisticMessages = [...messages, { role: 'user', content: `🔍 Extract: ${extractSchema}` }]
+    onConversationUpdate({ ...conversation, messages: optimisticMessages })
     try {
-      const res = await axios.post('/api/extract', { doc_id: doc.id, schema: extractSchema })
-      setMessages(prev => [...prev, { role: 'assistant', content: res.data.result }])
+      const results = await Promise.all(
+        docs.map(doc => axios.post('/api/extract', { doc_id: doc.id, schema: extractSchema })
+          .then(res => `${doc.name}:\n${res.data.result}`)
+        )
+      )
+      onConversationUpdate({
+        ...conversation,
+        messages: [...optimisticMessages, { role: 'assistant', content: results.join('\n\n') }]
+      })
     } catch (err) {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Error extracting.' }])
+      onConversationUpdate({
+        ...conversation,
+        messages: [...optimisticMessages, { role: 'assistant', content: 'Error extracting.' }]
+      })
     }
     setExtractSchema('')
     setExtracting(false)
   }
 
-  if (!doc) return (
+  if (!conversation) return (
     <div style={{
-      flex: 1, display: 'flex', alignItems: 'center',
-      justifyContent: 'center', color: '#666', fontSize: '14px'
+      flex: 1, display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      color: '#666', fontSize: '14px', gap: '12px'
     }}>
-      Upload a PDF to get started
+      <p>Click <strong style={{ color: '#999' }}>+ New Chat</strong> to start</p>
+      <p style={{ fontSize: '12px' }}>Then upload a PDF to chat with it</p>
     </div>
   )
 
@@ -89,18 +127,22 @@ export default function ChatWindow({ doc }) {
         padding: '14px 20px', borderBottom: '1px solid #2f2f2f',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between'
       }}>
-        <span style={{ fontSize: '14px', fontWeight: 500 }}>📄 {doc.name}</span>
+        <span style={{ fontSize: '14px', color: '#999' }}>
+          {docs.length > 0
+            ? `${docs.length} doc${docs.length > 1 ? 's' : ''} loaded`
+            : 'No docs loaded — upload a PDF'}
+        </span>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={handleSummarize} disabled={summarizing} style={btnStyle('#2f2f2f')}>
+          <button onClick={handleSummarize} disabled={summarizing || docs.length === 0} style={btnStyle('#2f2f2f')}>
             {summarizing ? 'Summarizing...' : '📋 Summarize'}
           </button>
-          <button onClick={() => setShowExtract(!showExtract)} style={btnStyle('#2f2f2f')}>
+          <button onClick={() => setShowExtract(!showExtract)} disabled={docs.length === 0} style={btnStyle('#2f2f2f')}>
             🔍 Extract
           </button>
         </div>
       </div>
 
-      {/* Extract input bar */}
+      {/* Extract bar */}
       {showExtract && (
         <div style={{ padding: '10px 20px', background: '#1a1a1a', display: 'flex', gap: '8px' }}>
           <input
@@ -109,8 +151,8 @@ export default function ChatWindow({ doc }) {
             placeholder="What do you want to extract? e.g. all dates and recommendations"
             style={{ ...inputStyle, flex: 1 }}
           />
-          <button onClick={handleExtract} style={btnStyle('#10a37f')}>
-            Extract
+          <button onClick={handleExtract} disabled={extracting} style={btnStyle('#10a37f')}>
+            {extracting ? 'Extracting...' : 'Extract'}
           </button>
         </div>
       )}
@@ -119,7 +161,9 @@ export default function ChatWindow({ doc }) {
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', color: '#666', fontSize: '13px', marginTop: '40px' }}>
-            Ask anything about <strong style={{ color: '#999' }}>{doc.name}</strong>
+            {docs.length > 0
+              ? `Ask anything about your ${docs.length} document${docs.length > 1 ? 's' : ''}`
+              : 'Upload a PDF to get started'}
           </div>
         )}
         {messages.map((msg, i) => (
@@ -134,9 +178,10 @@ export default function ChatWindow({ doc }) {
               borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
               background: msg.role === 'user' ? '#2f2f2f' : '#1a1a1a',
               fontSize: '14px',
-              lineHeight: '1.5',
+              lineHeight: '1.6',
               color: '#ececec',
-              border: msg.role === 'assistant' ? '1px solid #2f2f2f' : 'none'
+              border: msg.role === 'assistant' ? '1px solid #2f2f2f' : 'none',
+              whiteSpace: 'pre-wrap'
             }}>
               {msg.content}
             </div>
@@ -162,7 +207,7 @@ export default function ChatWindow({ doc }) {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && sendMessage()}
-          placeholder="Ask a question about this document..."
+          placeholder="Ask anything about your documents..."
           style={{ ...inputStyle, flex: 1 }}
         />
         <button onClick={sendMessage} disabled={loading} style={btnStyle('#10a37f')}>

@@ -1,7 +1,10 @@
 import { useRef } from 'react'
-import axios from 'axios'
 
-export default function Sidebar({ docs, activeDockId, onDocSelect, onUpload, uploading }) {
+export default function Sidebar({
+  conversations, activeConversationId,
+  onNewChat, onSelectConversation,
+  docs, onUpload, uploading
+}) {
   const fileRef = useRef(null)
 
   const handleFileChange = async (e) => {
@@ -10,6 +13,7 @@ export default function Sidebar({ docs, activeDockId, onDocSelect, onUpload, upl
     const formData = new FormData()
     formData.append('file', file)
     onUpload(formData, file.name)
+    e.target.value = ''
   }
 
   return (
@@ -22,27 +26,33 @@ export default function Sidebar({ docs, activeDockId, onDocSelect, onUpload, upl
       borderRight: '1px solid #2f2f2f',
       flexShrink: 0
     }}>
-      {/* App title */}
       <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid #2f2f2f' }}>
         <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#ececec' }}>
           📄 Doc Intelligence
         </h2>
       </div>
 
-      {/* Upload button */}
-      <div style={{ padding: '12px' }}>
+      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <button
+          onClick={onNewChat}
+          style={{
+            width: '100%', padding: '10px',
+            background: '#2f2f2f', border: '1px solid #444',
+            borderRadius: '8px', color: '#ececec',
+            cursor: 'pointer', fontSize: '13px', textAlign: 'left'
+          }}
+        >
+          + New Chat
+        </button>
         <button
           onClick={() => fileRef.current.click()}
           disabled={uploading}
           style={{
-            width: '100%',
-            padding: '10px',
-            background: uploading ? '#2f2f2f' : '#2f2f2f',
-            border: '1px dashed #444',
-            borderRadius: '8px',
-            color: uploading ? '#666' : '#ececec',
+            width: '100%', padding: '10px',
+            background: 'transparent', border: '1px dashed #444',
+            borderRadius: '8px', color: uploading ? '#666' : '#999',
             cursor: uploading ? 'not-allowed' : 'pointer',
-            fontSize: '13px'
+            fontSize: '13px', textAlign: 'left'
           }}
         >
           {uploading ? '⏳ Processing...' : '+ Upload PDF'}
@@ -56,31 +66,50 @@ export default function Sidebar({ docs, activeDockId, onDocSelect, onUpload, upl
         />
       </div>
 
-      {/* Document list */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
-        {docs.length === 0 && (
-          <p style={{ fontSize: '12px', color: '#666', textAlign: 'center', marginTop: '20px' }}>
-            No documents yet
+      {docs.length > 0 && (
+        <div style={{ padding: '0 12px 8px' }}>
+          <p style={{ fontSize: '11px', color: '#666', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Loaded docs
+          </p>
+          {docs.map(doc => (
+            <div key={doc.id} style={{
+              fontSize: '12px', color: '#999',
+              padding: '4px 8px', whiteSpace: 'nowrap',
+              overflow: 'hidden', textOverflow: 'ellipsis'
+            }}>
+              📄 {doc.name}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px', borderTop: '1px solid #2f2f2f', paddingTop: '8px' }}>
+        <p style={{ fontSize: '11px', color: '#666', padding: '4px 8px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Conversations
+        </p>
+        {conversations.length === 0 && (
+          <p style={{ fontSize: '12px', color: '#555', textAlign: 'center', marginTop: '12px' }}>
+            No conversations yet
           </p>
         )}
-        {docs.map(doc => (
+        {conversations.map(convo => (
           <div
-            key={doc.id}
-            onClick={() => onDocSelect(doc)}
+            key={convo.id}
+            onClick={() => onSelectConversation(convo)}
             style={{
               padding: '10px 12px',
               borderRadius: '8px',
               cursor: 'pointer',
-              background: activeDockId === doc.id ? '#2f2f2f' : 'transparent',
-              marginBottom: '4px',
+              background: activeConversationId === convo.id ? '#2f2f2f' : 'transparent',
+              marginBottom: '2px',
               fontSize: '13px',
-              color: activeDockId === doc.id ? '#ececec' : '#999',
+              color: activeConversationId === convo.id ? '#ececec' : '#999',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis'
             }}
           >
-            📄 {doc.name}
+            💬 {convo.title}
           </div>
         ))}
       </div>
