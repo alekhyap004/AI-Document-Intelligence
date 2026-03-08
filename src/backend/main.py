@@ -10,7 +10,7 @@ from sqlalchemy import desc
 from src.backend.ingest import save_pdf, build_index
 from src.backend.query import query_document, query_multiple_documents, summarize_document
 from src.backend.database import get_db, engine, Base
-from src.backend.models import Conversation, Message
+from src.backend.models import Conversation, Message, Document
 
 # Create tables if they don't exist
 Base.metadata.create_all(bind=engine)
@@ -46,13 +46,20 @@ def health_check():
 # ─── Upload ────────────────────────────────────────────────────
 
 @app.post("/upload")
-async def upload_pdf(file: UploadFile = File(...)):
+async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)):
     temp_path = f"/tmp/{file.filename}"
     with open(temp_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
+    
     doc_id = save_pdf(temp_path, file.filename)
     build_index(doc_id)
-    return {"doc_id": doc_id, "message": "PDF uploaded and indexed successfully"}
+
+    # Save document record to database
+    doc_record = Document(id=doc_id, filename=file.filename)
+    db.add(doc_record)
+    db.commit()
+
+    return {"doc_id": doc_id, "filename": file.filename, "message": "PDF uploaded and indexed successfully"}
 
 # ─── Conversations ─────────────────────────────────────────────
 
@@ -91,14 +98,25 @@ def get_conversation(conversation_id: str, db: Session = Depends(get_db)):
     ).first()
     if not conversation:
         return {"error": "Conversation not found"}
+    
     messages = [
         {"role": m.role, "content": m.content}
         for m in conversation.messages
     ]
+
+    # Look up real filenames for each doc_id
+    doc_ids = json.loads(conversation.doc_ids) if conversation.doc_ids else []
+    docs = []
+    for doc_id in doc_ids:
+        doc_record = db.query(Document).filter(Document.id == doc_id).first()
+        if doc_record:
+            docs.append({"id": doc_record.id, "name": doc_record.filename})
+
     return {
         "id": str(conversation.id),
         "title": conversation.title,
-        "doc_ids": json.loads(conversation.doc_ids) if conversation.doc_ids else [],
+        "doc_ids": doc_ids,
+        "docs": docs,
         "messages": messages
     }
 

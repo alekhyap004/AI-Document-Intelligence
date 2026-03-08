@@ -5,6 +5,13 @@ from datetime import datetime
 import uuid
 from src.backend.database import Base
 
+class Document(Base):
+    __tablename__ = "documents"
+
+    id = Column(String, primary_key=True)  # this is the doc_id from LlamaIndex
+    filename = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 class Conversation(Base):
     __tablename__ = "conversations"
 

@@ -28,8 +28,8 @@ export default function App() {
       const res = await axios.post('/api/conversations')
       const newConvo = res.data
       setConversations(prev => [newConvo, ...prev])
-      setActiveConversation(newConvo)
-      setDocs([])  // clear docs for new conversation
+      setActiveConversation({ ...newConvo, messages: [] })
+      setDocs([])
     } catch (err) {
       alert('Failed to create conversation.')
     }
@@ -39,10 +39,8 @@ export default function App() {
     try {
       const res = await axios.get(`/api/conversations/${convo.id}`)
       setActiveConversation(res.data)
-      // Restore the docs that belong to this conversation
-      const savedDocIds = res.data.doc_ids || []
-      // We only have IDs not names, so map them back
-      setDocs(savedDocIds.map(id => ({ id, name: `Document (${id.slice(0, 8)}...)` })))
+      // Restore real doc names from database
+      setDocs(res.data.docs || [])
     } catch (err) {
       console.error('Failed to load conversation:', err)
     }
