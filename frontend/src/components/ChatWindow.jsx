@@ -32,7 +32,7 @@ export default function ChatWindow({ conversation, docs, onConversationUpdate })
     onConversationUpdate({ ...conversation, messages: optimisticMessages })
 
     try {
-      const res = await axios.post(`${API_BASE}/api/conversations/${conversation.id}/chat`, {
+      const res = await axios.post(`${API_BASE}/conversations/${conversation.id}/chat`, {
         doc_ids: docs.map(d => d.id),
         question
       })
@@ -65,7 +65,7 @@ export default function ChatWindow({ conversation, docs, onConversationUpdate })
     onConversationUpdate({ ...conversation, messages: optimisticMessages })
     try {
       const summaries = await Promise.all(
-        docs.map(doc => axios.post(`${API_BASE}/api/summarize`, { doc_id: doc.id })
+        docs.map(doc => axios.post(`${API_BASE}/summarize`, { doc_id: doc.id })
           .then(res => `${doc.name}:\n${res.data.summary}`)
         )
       )
@@ -90,7 +90,7 @@ export default function ChatWindow({ conversation, docs, onConversationUpdate })
     onConversationUpdate({ ...conversation, messages: optimisticMessages })
     try {
       const results = await Promise.all(
-        docs.map(doc => axios.post(`${API_BASE}/api/extract`, { doc_id: doc.id, schema: extractSchema })
+        docs.map(doc => axios.post(`${API_BASE}/extract`, { doc_id: doc.id, schema: extractSchema })
           .then(res => `${doc.name}:\n${res.data.result}`)
         )
       )
